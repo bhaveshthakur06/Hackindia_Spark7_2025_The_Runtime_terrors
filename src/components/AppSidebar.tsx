@@ -89,7 +89,7 @@ export function AppSidebar() {
             <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
               G
             </div>
-            <span className="ml-2 text-xl font-bold">GrainLy</span>
+            <span className="ml-2 text-xl font-bold">GrainLink</span>
           </div>
         )}
       </div>

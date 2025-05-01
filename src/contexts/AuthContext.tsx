@@ -20,14 +20,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check if user was logged in previously
-    const storedUser = localStorage.getItem('grainly-user');
+    const storedUser = localStorage.getItem('grainlink-user');
     
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
       } catch (error) {
         console.error('Error parsing stored user:', error);
-        localStorage.removeItem('grainly-user');
+        localStorage.removeItem('grainlink-user');
       }
     }
     
@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Save user to localStorage whenever it changes
   useEffect(() => {
     if (user) {
-      localStorage.setItem('grainly-user', JSON.stringify(user));
+      localStorage.setItem('grainlink-user', JSON.stringify(user));
     }
   }, [user]);
 
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // In a real app, this would call your backend API
       // For now, we'll simulate a successful login with mock credentials
-      if (credentials.email === 'admin@grainly.com' && credentials.password === 'password') {
+      if (credentials.email === 'admin@grainlink.com' && credentials.password === 'password') {
         setUser({
           id: '1',
           name: 'Admin User',
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return true;
       }
       
-      if (credentials.email === 'distributor@grainly.com' && credentials.password === 'password') {
+      if (credentials.email === 'distributor@grainlink.com' && credentials.password === 'password') {
         setUser({
           id: '2',
           name: 'Distributor User',
@@ -71,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return true;
       }
       
-      if (credentials.email === 'beneficiary@grainly.com' && credentials.password === 'password') {
+      if (credentials.email === 'beneficiary@grainlink.com' && credentials.password === 'password') {
         setUser({
           id: '3',
           name: 'Beneficiary User',
@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('grainly-user');
+    localStorage.removeItem('grainlink-user');
     toast.info('You have been logged out');
   };
 

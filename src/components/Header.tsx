@@ -47,7 +47,7 @@ export function Header() {
           </div>
           <div className="hidden md:block">
             <h1 className="text-xl font-semibold tracking-tight">
-              GrainLy - Ration Distribution System
+              GrainLink - Ration Distribution System
             </h1>
           </div>
         </div>

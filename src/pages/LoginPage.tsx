@@ -53,7 +53,10 @@ export default function LoginPage() {
   }
 
   const onSubmit = async (values: z.infer<typeof loginSchema>) => {
-    const success = await login(values);
+    const success = await login({
+      email: values.email, // Ensure email is always provided
+      password: values.password
+    });
     if (success) {
       navigate("/dashboard");
     }
@@ -81,7 +84,7 @@ export default function LoginPage() {
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
             <span className="text-2xl font-bold text-white">G</span>
           </div>
-          <CardTitle className="text-2xl">Welcome to GrainLy</CardTitle>
+          <CardTitle className="text-2xl">Welcome to GrainLink</CardTitle>
           <CardDescription>
             Ration Distribution Management System
           </CardDescription>
@@ -143,9 +146,9 @@ export default function LoginPage() {
               </Form>
               <div className="mt-4 text-center text-sm text-muted-foreground">
                 <p>Demo logins:</p>
-                <p className="mt-1">admin@grainly.com / password</p>
-                <p>distributor@grainly.com / password</p>
-                <p>beneficiary@grainly.com / password</p>
+                <p className="mt-1">admin@grainlink.com / password</p>
+                <p>distributor@grainlink.com / password</p>
+                <p>beneficiary@grainlink.com / password</p>
               </div>
             </TabsContent>
             <TabsContent value="wallet" className="mt-4">

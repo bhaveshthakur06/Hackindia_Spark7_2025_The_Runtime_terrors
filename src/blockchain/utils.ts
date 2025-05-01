@@ -1,4 +1,3 @@
-
 import { ethers } from 'ethers';
 import { toast } from "sonner";
 import { getProvider, getGrainlyContract } from './contracts';
@@ -262,4 +261,30 @@ export const generateLocationHash = (latitude: number, longitude: number): strin
       [Math.round(latitude * 1000000), Math.round(longitude * 1000000)]
     )
   );
+};
+
+// Get user role from blockchain
+export const getUserRole = async (address: string): Promise<string> => {
+  try {
+    // In a real application, this would query a smart contract
+    // For now, we'll simulate different roles based on address
+    
+    // Convert address to lowercase for consistency
+    const lowerAddress = address.toLowerCase();
+    
+    // Last character of address for deterministic role assignment
+    const lastChar = lowerAddress.charAt(lowerAddress.length - 1);
+    
+    // Assign roles based on address (simulated)
+    if (['0', '1', '2'].includes(lastChar)) {
+      return 'admin';
+    } else if (['3', '4', '5', '6'].includes(lastChar)) {
+      return 'distributor';
+    } else {
+      return 'beneficiary';
+    }
+  } catch (error) {
+    console.error("Error getting user role:", error);
+    return 'guest';
+  }
 };
