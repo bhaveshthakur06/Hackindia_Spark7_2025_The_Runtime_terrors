@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,7 +62,40 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				success: {
+					DEFAULT: 'hsl(var(--success))',
+					foreground: 'hsl(var(--success-foreground))'
+				},
+				coffee: {
+					DEFAULT: 'hsl(28 34% 40%)', 
+					50: 'hsl(28, 34%, 95%)',
+					100: 'hsl(28, 34%, 90%)',
+					200: 'hsl(28, 34%, 80%)',
+					300: 'hsl(28, 34%, 70%)',
+					400: 'hsl(28, 34%, 60%)',
+					500: 'hsl(28, 34%, 50%)',
+					600: 'hsl(28, 34%, 40%)',
+					700: 'hsl(28, 34%, 30%)',
+					800: 'hsl(28, 34%, 20%)',
+					900: 'hsl(28, 34%, 10%)'
+				},
+				beige: {
+					DEFAULT: 'hsl(30 24% 90%)',
+					50: 'hsl(30, 24%, 98%)',
+					100: 'hsl(30, 24%, 95%)',
+					200: 'hsl(30, 24%, 90%)',
+					300: 'hsl(30, 24%, 80%)',
+					400: 'hsl(30, 24%, 70%)',
+					500: 'hsl(30, 24%, 60%)',
+					600: 'hsl(30, 24%, 50%)',
+					700: 'hsl(30, 24%, 40%)',
+					800: 'hsl(30, 24%, 30%)',
+					900: 'hsl(30, 24%, 20%)'
 				}
+			},
+			fontFamily: {
+				sans: ['Inter', 'system-ui', 'sans-serif'],
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +118,22 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				pulse: {
+					'0%, 100%': { opacity: 1 },
+					'50%': { opacity: 0.5 },
+				},
+				shimmer: {
+					'100%': {
+						transform: 'translateX(100%)',
+					},
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+				shimmer: 'shimmer 1s infinite',
 			}
 		}
 	},
