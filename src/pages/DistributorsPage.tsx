@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Distributor } from "@/types";
+import { Distributor, DistributionCenter } from "@/types";
 import { registerDistributor } from "@/blockchain/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -43,15 +43,32 @@ const distributorSchema = z.object({
     contactNumber: z.string().min(5, "Contact number is required"),
     assignedCenter: z.string().min(2, "Assigned center is required"),
     status: z.enum(["active", "inactive"]),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
 });
+
+// Helper function to calculate distance between two points
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
 
 export default function DistributorsPage() {
     const [distributors, setDistributors] = useState<Distributor[]>([]);
+    const [distributionCenters, setDistributionCenters] = useState<DistributionCenter[]>([]);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [networkFee, setNetworkFee] = useState<string | null>(null);
     const [isEstimating, setIsEstimating] = useState(false);
+    const [isLocating, setIsLocating] = useState(false);
 
     const form = useForm<z.infer<typeof distributorSchema>>({
         resolver: zodResolver(distributorSchema),
@@ -62,58 +79,102 @@ export default function DistributorsPage() {
             contactNumber: "",
             assignedCenter: "",
             status: "active",
+            latitude: undefined,
+            longitude: undefined,
         },
     });
 
     useEffect(() => {
-        const fetchDistributors = async () => {
+        const fetchData = async () => {
             setIsLoading(true);
             try {
-                // Test: Add a distributor
-                const testDistributor = {
-                    name: "Test Distributor",
-                    wallet_address: "0x1234567890123456789012345678901234567890",
-                    govt_id: "TEST123",
-                    phone: "1234567890",
-                    role: "distributor",
-                    assigned_center: "Test Center"
-                };
-
-                console.log("Adding test distributor...");
-                const { data: insertData, error: insertError } = await supabase
-                    .from("users")
-                    .insert([testDistributor])
-                    .select()
-                    .single();
-
-                if (insertError) {
-                    console.error("Error adding test distributor:", insertError);
-                }
-
-                console.log("Fetching distributors...");
-                const { data, error } = await supabase
+                // Fetch distributors
+                const { data: distributorData, error: distributorError } = await supabase
                     .from("users")
                     .select("*")
                     .eq("role", "distributor");
 
-                if (error) {
-                    console.error("Supabase error:", error);
-                    toast.error(`Failed to fetch distributors: ${error.message}`);
+                if (distributorError) {
+                    console.error("Supabase error:", distributorError);
+                    toast.error(`Failed to fetch distributors: ${distributorError.message}`);
                     setIsLoading(false);
                     return;
                 }
 
-                console.log("Fetched distributors:", data);
-                setDistributors((data || []).map(mapUserToDistributor));
+                // Fetch distribution centers
+                const { data: centerData, error: centerError } = await supabase
+                    .from("distribution_centers")
+                    .select("*");
+
+                if (centerError) {
+                    console.error("Supabase error:", centerError);
+                    toast.error(`Failed to fetch distribution centers: ${centerError.message}`);
+                    setIsLoading(false);
+                    return;
+                }
+
+                setDistributors((distributorData || []).map(mapUserToDistributor));
+                setDistributionCenters(centerData || []);
                 setIsLoading(false);
             } catch (err) {
                 console.error("Unexpected error:", err);
-                toast.error("An unexpected error occurred while fetching distributors");
+                toast.error("An unexpected error occurred while fetching data");
                 setIsLoading(false);
             }
         };
-        fetchDistributors();
+        fetchData();
     }, []);
+
+    const findNearestCenter = (lat: number, lon: number): DistributionCenter | null => {
+        if (!distributionCenters.length) return null;
+        
+        let nearestCenter = distributionCenters[0];
+        let minDistance = calculateDistance(
+            lat, lon,
+            nearestCenter.coordinates.latitude,
+            nearestCenter.coordinates.longitude
+        );
+
+        for (const center of distributionCenters) {
+            const distance = calculateDistance(
+                lat, lon,
+                center.coordinates.latitude,
+                center.coordinates.longitude
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestCenter = center;
+            }
+        }
+
+        return nearestCenter;
+    };
+
+    const handleLocationDetection = async () => {
+        setIsLocating(true);
+        try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            });
+
+            const { latitude, longitude } = position.coords;
+            const nearestCenter = findNearestCenter(latitude, longitude);
+
+            if (nearestCenter) {
+                form.setValue("assignedCenter", nearestCenter.name);
+                form.setValue("latitude", latitude);
+                form.setValue("longitude", longitude);
+                toast.success(`Assigned to nearest center: ${nearestCenter.name}`);
+            } else {
+                toast.error("No distribution centers found nearby");
+            }
+        } catch (error) {
+            console.error("Error getting location:", error);
+            toast.error("Failed to detect location. Please enable location services.");
+        } finally {
+            setIsLocating(false);
+        }
+    };
 
     // Estimate network fee for registerDistributor
     const estimateNetworkFee = async (walletAddress: string, govtId: string, assignedCenter: string) => {
@@ -175,6 +236,8 @@ export default function DistributorsPage() {
                     assigned_center: values.assignedCenter,
                     status: values.status,
                     role: "distributor",
+                    latitude: values.latitude,
+                    longitude: values.longitude,
                 },
             ]).select().single();
             if (error) {
@@ -270,9 +333,19 @@ export default function DistributorsPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Assigned Center</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Central Distribution Center" {...field} />
-                                            </FormControl>
+                                            <div className="flex gap-2">
+                                                <FormControl>
+                                                    <Input placeholder="Central Distribution Center" {...field} />
+                                                </FormControl>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={handleLocationDetection}
+                                                    disabled={isLocating}
+                                                >
+                                                    {isLocating ? "Detecting..." : "Auto-detect"}
+                                                </Button>
+                                            </div>
                                             <FormMessage />
                                         </FormItem>
                                     )}

@@ -51,8 +51,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Users, Plus, MoreHorizontal, Check, X, Edit, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 import { ethers } from "ethers";
+
+// Initialize Supabase client
+const supabase = createClient(
+  "https://ayqdbfgwdiejecircotr.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5cWRiZmd3ZGllamVjaXJjb3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTE1NDIsImV4cCI6MjA2MTY4NzU0Mn0.Ww0HNOgFppX_8WjOm26W2h6zf6iz__fa91YcRCPaYEU"
+);
 
 // Form schema for adding a new beneficiary
 const beneficiarySchema = z.object({
@@ -64,6 +70,19 @@ const beneficiarySchema = z.object({
   familySize: z.coerce.number().min(1, "Family size must be at least 1"),
   eligibilityStatus: z.enum(["pending", "approved", "rejected"]),
 });
+
+// Define Supabase user type
+interface SupabaseUser {
+  id: string;
+  name: string;
+  wallet_address: string | null;
+  govt_id: string;
+  contact_number: string;
+  location: string;
+  family_size: number;
+  eligibility_status: "pending" | "approved" | "rejected";
+  created_at: string;
+}
 
 export default function BeneficiaryManagement() {
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
@@ -86,39 +105,60 @@ export default function BeneficiaryManagement() {
     },
   });
 
+  // Fetch beneficiaries from Supabase on load
   useEffect(() => {
-    const fetchBeneficiaries = async () => {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('role', 'beneficiary');
-      if (error) {
-        toast.error('Failed to fetch beneficiaries');
+    async function fetchBeneficiaries() {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from("beneficiaries")
+          .select("*");
+
+        if (error) {
+          console.error("Supabase error details:", error);
+          toast.error(`Error loading beneficiaries: ${error.message}`);
+          return;
+        }
+
+        if (!data) {
+          console.warn("No data returned from Supabase");
+          setBeneficiaries([]);
+          return;
+        }
+
+        console.log("Fetched beneficiaries:", data);
+        setBeneficiaries(data.map(mapUserToBeneficiary));
+      } catch (error) {
+        console.error("Unexpected error:", error);
+        toast.error("An unexpected error occurred while loading beneficiaries");
+      } finally {
         setIsLoading(false);
-        return;
       }
-      setBeneficiaries((data || []).map(mapUserToBeneficiary));
-      setIsLoading(false);
-    };
+    }
     fetchBeneficiaries();
   }, []);
 
   const onSubmit = async (values: z.infer<typeof beneficiarySchema>) => {
     setIsProcessing(true);
     try {
-      // In a real app, this would be connected to your blockchain
-      const newBeneficiary: Beneficiary = {
-        id: `ben-${Date.now()}`,
+      console.log("Form values:", values);
+      
+      // Validate required fields
+      if (!values.name || !values.govtId || !values.contactNumber || !values.location) {
+        throw new Error("All required fields must be filled");
+      }
+
+      const newBeneficiary = {
         name: values.name,
-        walletAddress: values.walletAddress,
-        govtId: values.govtId,
-        contactNumber: values.contactNumber,
+        wallet_address: values.walletAddress || null,
+        govt_id: values.govtId,
+        contact_number: values.contactNumber,
         location: values.location,
-        familySize: values.familySize,
-        eligibilityStatus: values.eligibilityStatus,
-        registrationDate: new Date().toISOString().slice(0, 10),
+        family_size: values.familySize,
+        eligibility_status: values.eligibilityStatus,
       };
+
+      console.log("Prepared Supabase data:", newBeneficiary);
 
       // If a wallet address is provided, register on blockchain
       if (values.walletAddress) {
@@ -134,33 +174,80 @@ export default function BeneficiaryManagement() {
         }
       }
 
-      setBeneficiaries([newBeneficiary, ...beneficiaries]);
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from("beneficiaries")
+        .insert([newBeneficiary])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase insert error details:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Supabase error: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error("No data returned after insert");
+      }
+
+      console.log("Successfully inserted beneficiary:", data);
+      setBeneficiaries([mapUserToBeneficiary(data), ...beneficiaries]);
       setIsAddDialogOpen(false);
       form.reset();
       toast.success("Beneficiary added successfully");
     } catch (error) {
       console.error("Error adding beneficiary:", error);
-      toast.error("Failed to add beneficiary");
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to add beneficiary: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleStatusChange = (beneficiaryId: string, newStatus: "pending" | "approved" | "rejected") => {
-    setBeneficiaries(
-      beneficiaries.map((beneficiary) =>
-        beneficiary.id === beneficiaryId
-          ? { ...beneficiary, eligibilityStatus: newStatus }
-          : beneficiary
-      )
-    );
+  const handleStatusChange = async (beneficiaryId: string, newStatus: "pending" | "approved" | "rejected") => {
+    try {
+      const { error } = await supabase
+        .from("beneficiaries")
+        .update({ eligibility_status: newStatus })
+        .eq("id", beneficiaryId);
 
-    toast.success(`Beneficiary status updated to ${newStatus}`);
+      if (error) throw error;
+
+      setBeneficiaries(
+        beneficiaries.map((beneficiary) =>
+          beneficiary.id === beneficiaryId
+            ? { ...beneficiary, eligibilityStatus: newStatus }
+            : beneficiary
+        )
+      );
+
+      toast.success(`Beneficiary status updated to ${newStatus}`);
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update beneficiary status");
+    }
   };
 
-  const handleDelete = (beneficiaryId: string) => {
-    setBeneficiaries(beneficiaries.filter((b) => b.id !== beneficiaryId));
-    toast.success("Beneficiary removed successfully");
+  const handleDelete = async (beneficiaryId: string) => {
+    try {
+      const { error } = await supabase
+        .from("beneficiaries")
+        .delete()
+        .eq("id", beneficiaryId);
+
+      if (error) throw error;
+
+      setBeneficiaries(beneficiaries.filter((b) => b.id !== beneficiaryId));
+      toast.success("Beneficiary removed successfully");
+    } catch (error) {
+      console.error("Error deleting beneficiary:", error);
+      toast.error("Failed to delete beneficiary");
+    }
   };
 
   // Add estimateNetworkFee function
@@ -215,7 +302,7 @@ export default function BeneficiaryManagement() {
 
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={onDialogOpen}>
               <Plus className="mr-2 h-4 w-4" />
               Add Beneficiary
             </Button>
@@ -351,7 +438,7 @@ export default function BeneficiaryManagement() {
                   />
                 </div>
 
-                {/* Add Network Fee Estimate section before the dialog footer */}
+                {/* Add Network Fee Estimate section */}
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Network Fee:</span>
                   {isEstimating ? (
@@ -530,16 +617,16 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // Helper to map Supabase user row to Beneficiary
-function mapUserToBeneficiary(user: any): Beneficiary {
+function mapUserToBeneficiary(user: SupabaseUser): Beneficiary {
   return {
     id: user.id,
     name: user.name || '',
     walletAddress: user.wallet_address || '',
     govtId: user.govt_id || '',
-    contactNumber: user.phone || '',
+    contactNumber: user.contact_number || '',
     location: user.location || '',
     familySize: user.family_size || 1,
     eligibilityStatus: user.eligibility_status || 'pending',
-    registrationDate: user.created_at ? user.created_at.slice(0, 10) : '',
+    registrationDate: new Date().toISOString().slice(0, 10),
   };
 }
