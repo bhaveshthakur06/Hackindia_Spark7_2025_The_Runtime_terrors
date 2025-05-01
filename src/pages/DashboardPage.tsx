@@ -1,16 +1,15 @@
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Users, Package, ShoppingCart, AlertTriangle, 
+import {
+  Users, Package, ShoppingCart, AlertTriangle,
   Check, Calendar, TrendingUp
 } from "lucide-react";
 import { DashboardStats } from "@/types";
@@ -31,6 +30,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
 
 const CHART_COLORS = [
   "#8B5CF6", "#D946EF", "#F97316", "#0EA5E9", "#10B981", "#F59E0B", "#EF4444"
@@ -74,6 +74,31 @@ const dailyData = [
 export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [beneficiaryCount, setBeneficiaryCount] = useState<number | null>(null);
+  const [distributorCount, setDistributorCount] = useState<number | null>(null);
+  const [distributionCount, setDistributionCount] = useState<number | null>(null);
+  const [lowStockCount, setLowStockCount] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      const [benRes, distRes, distriRes, invRes] = await Promise.all([
+        supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "beneficiary"),
+        supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "distributor"),
+        supabase.from("claims").select("id", { count: "exact", head: true }),
+        supabase.from("stock_records").select("quantity"),
+      ]);
+      setBeneficiaryCount(benRes.count ?? 0);
+      setDistributorCount(distRes.count ?? 0);
+      setDistributionCount(distriRes.count ?? 0);
+      // Low stock: quantity <= 5
+      const lowStock = (invRes.data || []).filter((item: any) => item.quantity <= 5).length;
+      setLowStockCount(lowStock);
+      setIsLoading(false);
+    };
+    fetchDashboardData();
+  }, []);
 
   useEffect(() => {
     // In a real app, you would fetch this data from your API
@@ -99,30 +124,30 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard 
+        <StatsCard
           title="Total Beneficiaries"
-          value={stats.totalBeneficiaries}
+          value={beneficiaryCount ?? 0}
           description="Registered individuals"
           icon={Users}
         />
-        <StatsCard 
+        <StatsCard
           title="Total Distributors"
-          value={stats.totalDistributors}
+          value={distributorCount ?? 0}
           description="Active distribution agents"
           icon={Package}
         />
-        <StatsCard 
+        <StatsCard
           title="Distributions"
-          value={stats.totalDistributions}
+          value={distributionCount ?? 0}
           description={`${stats.pendingDistributions} pending`}
           icon={ShoppingCart}
         />
-        <StatsCard 
+        <StatsCard
           title="Low Stock Items"
-          value={stats.lowStockItems}
+          value={lowStockCount ?? 0}
           description="Need restocking"
           icon={AlertTriangle}
-          variant={stats.lowStockItems > 0 ? "destructive" : "default"}
+          variant={lowStockCount && lowStockCount > 0 ? "destructive" : "default"}
         />
       </div>
 
@@ -140,7 +165,7 @@ export default function DashboardPage() {
                 <TabsTrigger value="daily">Daily</TabsTrigger>
               </TabsList>
             </div>
-            
+
             {/* Monthly Distribution Trend */}
             <TabsContent value="distributions" className="p-0">
               <Card>
@@ -160,11 +185,11 @@ export default function DashboardPage() {
                         <XAxis dataKey="name" />
                         <YAxis />
                         <Tooltip />
-                        <Line 
-                          type="monotone" 
-                          dataKey="distributions" 
-                          stroke="#8B5CF6" 
-                          strokeWidth={2} 
+                        <Line
+                          type="monotone"
+                          dataKey="distributions"
+                          stroke="#8B5CF6"
+                          strokeWidth={2}
                         />
                       </LineChart>
                     </ResponsiveContainer>
@@ -172,7 +197,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             {/* Inventory by Category */}
             <TabsContent value="inventory" className="p-0">
               <Card>
@@ -196,7 +221,7 @@ export default function DashboardPage() {
                           outerRadius={100}
                           fill="#8884d8"
                           dataKey="value"
-                          label={({ name, percent }) => 
+                          label={({ name, percent }) =>
                             `${name}: ${(percent * 100).toFixed(0)}%`
                           }
                         >
@@ -212,7 +237,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             {/* Daily Distribution Activity */}
             <TabsContent value="daily" className="p-0">
               <Card>
@@ -242,7 +267,7 @@ export default function DashboardPage() {
               </Card>
             </TabsContent>
           </Tabs>
-          
+
           {/* Recent Activity */}
           <Card>
             <CardHeader className="pb-2">
@@ -287,12 +312,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-        
+
         {/* Right column - Wallet and Other Info */}
         <div className="space-y-6">
           {/* Wallet Information */}
           <WalletInfo />
-          
+
           {/* Upcoming Distributions */}
           <Card>
             <CardHeader className="pb-2">
@@ -326,7 +351,7 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-          
+
           {/* Summary Card */}
           <Card>
             <CardHeader className="pb-2">
@@ -380,11 +405,10 @@ function StatsCard({ title, value, description, icon: Icon, variant = 'default' 
             <p className="text-3xl font-bold">{value}</p>
             <p className="text-xs text-muted-foreground mt-1">{description}</p>
           </div>
-          <div className={`rounded-full p-2.5 ${
-            variant === 'destructive' 
-              ? 'bg-red-100 text-red-600' 
-              : 'bg-primary/10 text-primary'
-          }`}>
+          <div className={`rounded-full p-2.5 ${variant === 'destructive'
+            ? 'bg-red-100 text-red-600'
+            : 'bg-primary/10 text-primary'
+            }`}>
             <Icon className="h-6 w-6" />
           </div>
         </div>

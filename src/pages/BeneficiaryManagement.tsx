@@ -1,10 +1,8 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Beneficiary } from "@/types";
-import { beneficiaries as mockBeneficiaries } from "@/mock/data";
 import { registerBeneficiary } from "@/blockchain/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -53,6 +51,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Users, Plus, MoreHorizontal, Check, X, Edit, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { ethers } from "ethers";
 
 // Form schema for adding a new beneficiary
 const beneficiarySchema = z.object({
@@ -66,9 +66,12 @@ const beneficiarySchema = z.object({
 });
 
 export default function BeneficiaryManagement() {
-  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>(mockBeneficiaries);
+  const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [networkFee, setNetworkFee] = useState<string | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
 
   const form = useForm<z.infer<typeof beneficiarySchema>>({
     resolver: zodResolver(beneficiarySchema),
@@ -82,6 +85,24 @@ export default function BeneficiaryManagement() {
       eligibilityStatus: "pending",
     },
   });
+
+  useEffect(() => {
+    const fetchBeneficiaries = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'beneficiary');
+      if (error) {
+        toast.error('Failed to fetch beneficiaries');
+        setIsLoading(false);
+        return;
+      }
+      setBeneficiaries((data || []).map(mapUserToBeneficiary));
+      setIsLoading(false);
+    };
+    fetchBeneficiaries();
+  }, []);
 
   const onSubmit = async (values: z.infer<typeof beneficiarySchema>) => {
     setIsProcessing(true);
@@ -133,13 +154,46 @@ export default function BeneficiaryManagement() {
           : beneficiary
       )
     );
-    
+
     toast.success(`Beneficiary status updated to ${newStatus}`);
   };
 
   const handleDelete = (beneficiaryId: string) => {
     setBeneficiaries(beneficiaries.filter((b) => b.id !== beneficiaryId));
     toast.success("Beneficiary removed successfully");
+  };
+
+  // Add estimateNetworkFee function
+  const estimateNetworkFee = async (walletAddress: string, govtId: string, familySize: number) => {
+    setIsEstimating(true);
+    setNetworkFee(null);
+    try {
+      const { getGrainlyContract } = await import("@/blockchain/contracts");
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const contract = getGrainlyContract(true);
+      const signer = provider.getSigner();
+      const contractWithSigner = contract.connect(signer);
+      const gasPrice = await provider.getGasPrice();
+      const estimatedGas = await contractWithSigner.estimateGas.registerBeneficiary(walletAddress, govtId, familySize);
+      const feeInWei = estimatedGas.mul(gasPrice);
+      const feeInEth = ethers.utils.formatEther(feeInWei);
+      setNetworkFee(feeInEth);
+    } catch (err) {
+      setNetworkFee(null);
+      toast.error("Failed to estimate network fee");
+    } finally {
+      setIsEstimating(false);
+    }
+  };
+
+  const onDialogOpen = () => {
+    setIsAddDialogOpen(true);
+    setNetworkFee(null);
+  };
+
+  const onDialogClose = () => {
+    setIsAddDialogOpen(false);
+    setNetworkFee(null);
   };
 
   return (
@@ -297,11 +351,38 @@ export default function BeneficiaryManagement() {
                   />
                 </div>
 
+                {/* Add Network Fee Estimate section before the dialog footer */}
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">Network Fee:</span>
+                  {isEstimating ? (
+                    <span className="text-muted-foreground">Estimating...</span>
+                  ) : networkFee ? (
+                    <span className="text-green-700">~{networkFee} ETH</span>
+                  ) : (
+                    <span className="text-muted-foreground">N/A</span>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      const values = form.getValues();
+                      if (values.walletAddress && values.govtId && values.familySize) {
+                        await estimateNetworkFee(values.walletAddress, values.govtId, values.familySize);
+                      } else {
+                        toast.info("Fill wallet address, government ID, and family size to estimate fee.");
+                      }
+                    }}
+                  >
+                    Refresh Estimate
+                  </Button>
+                </div>
+
                 <DialogFooter>
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsAddDialogOpen(false)}
+                    onClick={onDialogClose}
                   >
                     Cancel
                   </Button>
@@ -323,92 +404,96 @@ export default function BeneficiaryManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Govt ID</TableHead>
-                <TableHead>Family Size</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Registration Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {beneficiaries.map((beneficiary) => (
-                <TableRow key={beneficiary.id}>
-                  <TableCell className="font-medium">
-                    {beneficiary.name}
-                    {beneficiary.walletAddress && (
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        Wallet
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{beneficiary.govtId}</TableCell>
-                  <TableCell>{beneficiary.familySize}</TableCell>
-                  <TableCell>{beneficiary.contactNumber}</TableCell>
-                  <TableCell>{beneficiary.registrationDate}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={beneficiary.eligibilityStatus} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            navigator.clipboard.writeText(beneficiary.id);
-                            toast.success("Beneficiary ID copied to clipboard");
-                          }}
-                        >
-                          Copy ID
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => handleStatusChange(beneficiary.id, "approved")}
-                        >
-                          <Check className="mr-2 h-4 w-4 text-green-500" />
-                          Mark as Approved
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleStatusChange(beneficiary.id, "rejected")}
-                        >
-                          <X className="mr-2 h-4 w-4 text-red-500" />
-                          Mark as Rejected
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleStatusChange(beneficiary.id, "pending")}
-                        >
-                          Reset to Pending
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600"
-                          onClick={() => handleDelete(beneficiary.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground">Loading beneficiaries...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Govt ID</TableHead>
+                  <TableHead>Family Size</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Registration Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {beneficiaries.map((beneficiary) => (
+                  <TableRow key={beneficiary.id}>
+                    <TableCell className="font-medium">
+                      {beneficiary.name}
+                      {beneficiary.walletAddress && (
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          Wallet
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{beneficiary.govtId}</TableCell>
+                    <TableCell>{beneficiary.familySize}</TableCell>
+                    <TableCell>{beneficiary.contactNumber}</TableCell>
+                    <TableCell>{beneficiary.registrationDate}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={beneficiary.eligibilityStatus} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              navigator.clipboard.writeText(beneficiary.id);
+                              toast.success("Beneficiary ID copied to clipboard");
+                            }}
+                          >
+                            Copy ID
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(beneficiary.id, "approved")}
+                          >
+                            <Check className="mr-2 h-4 w-4 text-green-500" />
+                            Mark as Approved
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(beneficiary.id, "rejected")}
+                          >
+                            <X className="mr-2 h-4 w-4 text-red-500" />
+                            Mark as Rejected
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleStatusChange(beneficiary.id, "pending")}
+                          >
+                            Reset to Pending
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600"
+                            onClick={() => handleDelete(beneficiary.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
         <CardFooter className="justify-between text-xs text-muted-foreground">
           <div>Showing {beneficiaries.length} beneficiaries</div>
@@ -442,4 +527,19 @@ function StatusBadge({ status }: { status: string }) {
         </Badge>
       );
   }
+}
+
+// Helper to map Supabase user row to Beneficiary
+function mapUserToBeneficiary(user: any): Beneficiary {
+  return {
+    id: user.id,
+    name: user.name || '',
+    walletAddress: user.wallet_address || '',
+    govtId: user.govt_id || '',
+    contactNumber: user.phone || '',
+    location: user.location || '',
+    familySize: user.family_size || 1,
+    eligibilityStatus: user.eligibility_status || 'pending',
+    registrationDate: user.created_at ? user.created_at.slice(0, 10) : '',
+  };
 }

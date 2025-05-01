@@ -1,5 +1,4 @@
-
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { ethers } from 'ethers';
 import { toast } from "sonner";
 import { BlockchainTransaction } from '../types';
@@ -12,6 +11,7 @@ interface BlockchainContextType {
   balance: string;
   networkName: string;
   connectWallet: () => Promise<string | null>;
+  disconnectWallet: () => void;
   transactions: BlockchainTransaction[];
   addTransaction: (tx: BlockchainTransaction) => void;
   isLoading: boolean;
@@ -26,6 +26,10 @@ export function BlockchainProvider({ children }: { children: ReactNode }) {
   const [networkName, setNetworkName] = useState<string>('Unknown Network');
   const [transactions, setTransactions] = useState<BlockchainTransaction[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isConnecting, setIsConnecting] = useState<boolean>(false);
+  const connectionAttempts = useRef<number>(0);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 second
 
   // Initial check for connected wallet
   useEffect(() => {
@@ -33,17 +37,17 @@ export function BlockchainProvider({ children }: { children: ReactNode }) {
       try {
         const connected = await isWalletConnected();
         setWalletConnected(connected);
-        
+
         if (connected) {
           const address = await getConnectedAddress();
           setWalletAddress(address);
-          
+
           // Get wallet balance
           if (address) {
             const provider = getProvider();
             const balance = await provider.getBalance(address);
             setBalance(ethers.utils.formatEther(balance));
-            
+
             // Get network
             const network = await provider.getNetwork();
             const networks: Record<number, string> = {
@@ -58,21 +62,21 @@ export function BlockchainProvider({ children }: { children: ReactNode }) {
               31337: "Hardhat Local",
               1337: "Local Network",
             };
-            
+
             setNetworkName(networks[network.chainId] || `Chain ID: ${network.chainId}`);
           }
         }
-        
+
         // Load mock transactions for now
         setTransactions(mockTransactions);
-        
+
       } catch (error) {
         console.error('Error checking wallet:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    
+
     checkWallet();
   }, []);
 
@@ -87,75 +91,105 @@ export function BlockchainProvider({ children }: { children: ReactNode }) {
         } else {
           setWalletConnected(true);
           setWalletAddress(accounts[0]);
-          
+
           // Get wallet balance
           const provider = getProvider();
           const balance = await provider.getBalance(accounts[0]);
           setBalance(ethers.utils.formatEther(balance));
         }
       };
-      
+
       window.ethereum.on('accountsChanged', handleAccountsChanged);
-      
+
       return () => {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
       };
     }
   }, []);
 
-  // Connect wallet function
+  // Connect wallet function with retry mechanism
   const connectWallet = async (): Promise<string | null> => {
+    if (isConnecting) {
+      toast.info("Wallet connection in progress...");
+      return null;
+    }
+
     try {
       if (!window.ethereum) {
         toast.error("MetaMask or an Ethereum wallet is required");
         return null;
       }
-      
+
+      setIsConnecting(true);
       setIsLoading(true);
-      
-      const provider = getProvider();
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
-      
-      if (accounts.length > 0) {
-        const address = accounts[0];
-        setWalletConnected(true);
-        setWalletAddress(address);
-        
-        // Get wallet balance
-        const balance = await provider.getBalance(address);
-        setBalance(ethers.utils.formatEther(balance));
-        
-        // Get network
-        const network = await provider.getNetwork();
-        const networks: Record<number, string> = {
-          1: "Ethereum Mainnet",
-          3: "Ropsten Testnet",
-          4: "Rinkeby Testnet", 
-          5: "Goerli Testnet",
-          42: "Kovan Testnet",
-          56: "Binance Smart Chain",
-          137: "Polygon Mainnet",
-          80001: "Mumbai Testnet",
-          31337: "Hardhat Local",
-          1337: "Local Network",
-        };
-        
-        setNetworkName(networks[network.chainId] || `Chain ID: ${network.chainId}`);
-        
-        toast.success("Wallet connected successfully");
-        return address;
-      }
-      
-      return null;
+      connectionAttempts.current = 0;
+
+      const attemptConnection = async (): Promise<string | null> => {
+        try {
+          const provider = getProvider();
+          const accounts = await window.ethereum.request({
+            method: "eth_requestAccounts",
+          });
+
+          if (accounts.length > 0) {
+            const address = accounts[0];
+            setWalletConnected(true);
+            setWalletAddress(address);
+
+            // Get wallet balance
+            const balance = await provider.getBalance(address);
+            setBalance(ethers.utils.formatEther(balance));
+
+            // Get network
+            const network = await provider.getNetwork();
+            const networks: Record<number, string> = {
+              1: "Ethereum Mainnet",
+              3: "Ropsten Testnet",
+              4: "Rinkeby Testnet",
+              5: "Goerli Testnet",
+              42: "Kovan Testnet",
+              56: "Binance Smart Chain",
+              137: "Polygon Mainnet",
+              80001: "Mumbai Testnet",
+              31337: "Hardhat Local",
+              1337: "Local Network",
+            };
+
+            setNetworkName(networks[network.chainId] || `Chain ID: ${network.chainId}`);
+
+            toast.success("Wallet connected successfully");
+            return address;
+          }
+          return null;
+        } catch (error: any) {
+          if (error.code === -32002 && connectionAttempts.current < MAX_RETRIES) {
+            connectionAttempts.current += 1;
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            return attemptConnection();
+          }
+          throw error;
+        }
+      };
+
+      return await attemptConnection();
     } catch (error) {
       console.error('Error connecting wallet:', error);
       toast.error("Failed to connect wallet");
       return null;
     } finally {
+      setIsConnecting(false);
       setIsLoading(false);
+      connectionAttempts.current = 0;
     }
+  };
+
+  // Disconnect wallet function
+  const disconnectWallet = () => {
+    setWalletConnected(false);
+    setWalletAddress(null);
+    setBalance('0.0');
+    setNetworkName('Unknown Network');
+    toast.success("Wallet disconnected");
   };
 
   // Add a transaction to the list
@@ -171,6 +205,7 @@ export function BlockchainProvider({ children }: { children: ReactNode }) {
         balance,
         networkName,
         connectWallet,
+        disconnectWallet,
         transactions,
         addTransaction,
         isLoading
@@ -183,10 +218,10 @@ export function BlockchainProvider({ children }: { children: ReactNode }) {
 
 export function useBlockchain() {
   const context = useContext(BlockchainContext);
-  
+
   if (context === undefined) {
     throw new Error('useBlockchain must be used within a BlockchainProvider');
   }
-  
+
   return context;
 }

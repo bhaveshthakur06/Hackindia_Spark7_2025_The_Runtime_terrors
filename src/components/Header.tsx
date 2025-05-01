@@ -1,40 +1,55 @@
-
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useBlockchain } from '../contexts/BlockchainContext';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from './ui/dropdown-menu';
 import { Button } from './ui/button';
-import { 
-  User, LogOut, Settings, 
-  ChevronDown, Wallet
+import {
+  User, LogOut, Settings,
+  ChevronDown, Wallet, Loader2
 } from 'lucide-react';
 import { Badge } from './ui/badge';
+import { toast } from 'sonner';
 
 export function Header() {
   const { user, logout } = useAuth();
-  const { walletConnected, walletAddress, connectWallet } = useBlockchain();
+  const { walletConnected, walletAddress, connectWallet, isLoading } = useBlockchain();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLocalConnecting, setIsLocalConnecting] = useState(false);
 
   const formatAddress = (address: string) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
+  const handleConnectWallet = async () => {
+    if (isLocalConnecting) return;
+
+    setIsLocalConnecting(true);
+    try {
+      await connectWallet();
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      toast.error("Failed to connect wallet");
+    } finally {
+      setIsLocalConnecting(false);
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-full items-center justify-between">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-14 items-center justify-between">
         <div className="flex items-center gap-2 md:gap-4">
           <div className="md:hidden">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="h-9 w-9"
               asChild
             >
@@ -51,7 +66,7 @@ export function Header() {
             </h1>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
           {/* Wallet connection status */}
           {walletConnected && walletAddress ? (
@@ -62,17 +77,27 @@ export function Header() {
               </Badge>
             </div>
           ) : (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               className="hidden md:flex"
-              onClick={() => connectWallet()}
+              onClick={handleConnectWallet}
+              disabled={isLoading || isLocalConnecting}
             >
-              <Wallet className="mr-1.5 h-4 w-4" />
-              Connect Wallet
+              {isLoading || isLocalConnecting ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <Wallet className="mr-1.5 h-4 w-4" />
+                  Connect Wallet
+                </>
+              )}
             </Button>
           )}
-          
+
           {user ? (
             <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -110,7 +135,7 @@ export function Header() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="cursor-pointer text-destructive focus:text-destructive"
                   onClick={() => {
                     logout();

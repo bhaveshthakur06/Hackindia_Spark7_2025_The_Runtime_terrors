@@ -1,4 +1,3 @@
-
 import { useBlockchain } from "../contexts/BlockchainContext";
 import { Button } from "./ui/button";
 import {
@@ -12,16 +11,24 @@ import {
 import { Badge } from "./ui/badge";
 import { Skeleton } from "./ui/skeleton";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { useState } from "react";
 
 export function WalletInfo() {
   const { walletConnected, walletAddress, balance, networkName, connectWallet, isLoading } = useBlockchain();
+  const [isLocalConnecting, setIsLocalConnecting] = useState(false);
 
   const handleConnectWallet = async () => {
+    if (isLocalConnecting) return;
+
+    setIsLocalConnecting(true);
     try {
       await connectWallet();
     } catch (error) {
       console.error("Error connecting wallet:", error);
       toast.error("Failed to connect wallet");
+    } finally {
+      setIsLocalConnecting(false);
     }
   };
 
@@ -60,8 +67,19 @@ export function WalletInfo() {
           </p>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleConnectWallet} className="w-full">
-            Connect Wallet
+          <Button
+            onClick={handleConnectWallet}
+            className="w-full"
+            disabled={isLoading || isLocalConnecting}
+          >
+            {isLoading || isLocalConnecting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              "Connect Wallet"
+            )}
           </Button>
         </CardFooter>
       </Card>
@@ -96,8 +114,8 @@ export function WalletInfo() {
         </div>
       </CardContent>
       <CardFooter>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="w-full"
           onClick={() => {
             if (walletAddress) {

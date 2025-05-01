@@ -350,7 +350,7 @@ export default function InventoryManagement() {
                 {activeTab === "all" ? "All Items" : `${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Items`}
               </CardTitle>
               <CardDescription>
-                {activeTab === "all" 
+                {activeTab === "all"
                   ? `Showing all ${filteredItems.length} inventory items`
                   : `Showing ${filteredItems.length} items in the ${activeTab} category`
                 }
@@ -389,15 +389,14 @@ export default function InventoryManagement() {
                               {getStockStatus(item.quantity_available)}%
                             </span>
                           </div>
-                          <Progress 
-                            value={getStockStatus(item.quantity_available)} 
-                            className={`h-2 ${
-                              item.quantity_available < 1000 
-                                ? "bg-red-100" 
-                                : item.quantity_available < 3000 
-                                  ? "bg-amber-100" 
+                          <Progress
+                            value={getStockStatus(item.quantity_available)}
+                            className={`h-2 ${item.quantity_available < 1000
+                                ? "bg-red-100"
+                                : item.quantity_available < 3000
+                                  ? "bg-amber-100"
                                   : "bg-green-100"
-                            }`}
+                              }`}
                           />
                         </div>
                       </TableCell>
