@@ -15,6 +15,7 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import BeneficiaryManagement from "./pages/BeneficiaryManagement";
 import InventoryManagement from "./pages/InventoryManagement";
+import TransactionsPage from "./pages/TransactionsPage";
 import NotFound from "./pages/NotFound";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 
@@ -68,6 +69,16 @@ const App = () => (
                   element={
                     <PrivateRoute allowedRoles={['admin', 'distributor']}>
                       <InventoryManagement />
+                    </PrivateRoute>
+                  }
+                />
+                
+                {/* Transaction History - All users */}
+                <Route
+                  path="/transactions"
+                  element={
+                    <PrivateRoute>
+                      <TransactionsPage />
                     </PrivateRoute>
                   }
                 />
