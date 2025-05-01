@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { BlockchainTransaction } from '@/types';
@@ -140,7 +141,9 @@ export default function TransactionsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {format(new Date(tx.timestamp), 'MMM d, yyyy HH:mm')}
+                          {typeof tx.timestamp === 'string' 
+                            ? format(new Date(tx.timestamp), 'MMM d, yyyy HH:mm')
+                            : format(new Date(tx.timestamp), 'MMM d, yyyy HH:mm')}
                         </TableCell>
                         <TableCell>
                           <Button 
@@ -202,7 +205,9 @@ export default function TransactionsPage() {
                 
                 <div className="font-medium">Date</div>
                 <div className="col-span-2">
-                  {format(new Date(selectedTransaction.timestamp), 'PPpp')}
+                  {typeof selectedTransaction.timestamp === 'string'
+                    ? format(new Date(selectedTransaction.timestamp), 'PPpp')
+                    : format(new Date(selectedTransaction.timestamp), 'PPpp')}
                 </div>
               </div>
               

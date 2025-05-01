@@ -158,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: userData.name,
         role: userData.role,
         isAuthenticated: true,
-        govtId: userData.govtId
+        govtId: userData.govtId // This is now allowed by our updated User interface
       };
       
       setUser(newUser);
@@ -220,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         name: userData.name,
         role: role || 'guest',
         isAuthenticated: true,
-        govtId: userData.govt_id
+        govtId: userData.govt_id // This is now allowed by our updated User interface
       };
       
       setUser(walletUser);

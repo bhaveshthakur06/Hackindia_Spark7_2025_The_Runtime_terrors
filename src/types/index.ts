@@ -10,6 +10,7 @@ export interface User {
   walletAddress?: string;
   role: UserRole;
   isAuthenticated: boolean;
+  govtId?: string; // Add this field to match our usage in AuthContext
 }
 
 // Auth types
@@ -97,14 +98,15 @@ export interface DistributionItem {
 
 // Blockchain Transaction
 export interface BlockchainTransaction {
+  id?: string;
   hash: string;
-  from: string;
-  to: string;
+  from_address: string;  // Changed from 'from' to match database schema
+  to_address: string;    // Changed from 'to' to match database schema
   value?: string;
-  timestamp: number;
+  timestamp: number | string;
   status: 'pending' | 'confirmed' | 'failed';
-  description: string;
-  blockNumber?: number;
+  action: string;       // Changed from 'description' to match database schema
+  block_number?: number; // Changed from 'blockNumber' to match database schema
 }
 
 // Inventory Transaction
