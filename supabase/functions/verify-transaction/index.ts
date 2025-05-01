@@ -1,6 +1,5 @@
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +20,8 @@ serve(async (req) => {
   
   try {
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_URL') ?? 'https://ayqdbfgwdiejecircotr.supabase.co',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5cWRiZmd3ZGllamVjaXJjb3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTE1NDIsImV4cCI6MjA2MTY4NzU0Mn0.Ww0HNOgFppX_8WjOm26W2h6zf6iz__fa91YcRCPaYEU',
       {
         auth: {
           autoRefreshToken: false,
@@ -47,7 +46,7 @@ serve(async (req) => {
     const token = authHeader.replace('Bearer ', '')
     
     // Verify the JWT
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token)
+    const { error: userError } = await supabaseClient.auth.getUser(token)
     
     if (userError) {
       return new Response(
@@ -112,7 +111,7 @@ serve(async (req) => {
     
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'An unknown error occurred' }),
       { 
         status: 500, 
         headers: { 'Content-Type': 'application/json', ...corsHeaders } 

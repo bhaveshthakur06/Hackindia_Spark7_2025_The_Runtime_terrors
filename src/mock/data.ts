@@ -7,8 +7,8 @@ import {
   DistributionCenter,
   InventoryTransaction,
   BlockchainTransaction,
-  DashboardStats
-} from '../types';
+  DashboardStats,
+ } from '../types/index.ts';
 
 // Mock Ration Items
 export const rationItems: RationItem[] = [
@@ -16,45 +16,45 @@ export const rationItems: RationItem[] = [
     id: '1',
     name: 'Rice',
     category: 'Grains',
-    unitOfMeasure: 'kg',
-    quantityAvailable: 5000,
-    expiryDate: '2025-12-01',
+    unit_of_measure: 'kg',
+    quantity_available: 5000,
+    expiry_date: '2025-12-01',
     image: '/placeholder.svg'
   },
   {
     id: '2',
     name: 'Wheat Flour',
     category: 'Grains',
-    unitOfMeasure: 'kg',
-    quantityAvailable: 3200,
-    expiryDate: '2025-11-15',
+    unit_of_measure: 'kg',
+    quantity_available: 3200,
+    expiry_date: '2025-11-15',
     image: '/placeholder.svg'
   },
   {
     id: '3',
     name: 'Sugar',
     category: 'Essentials',
-    unitOfMeasure: 'kg',
-    quantityAvailable: 1800,
-    expiryDate: '2025-10-20',
+    unit_of_measure: 'kg',
+    quantity_available: 1800,
+    expiry_date: '2025-10-20',
     image: '/placeholder.svg'
   },
   {
     id: '4',
     name: 'Cooking Oil',
     category: 'Essentials',
-    unitOfMeasure: 'liter',
-    quantityAvailable: 2500,
-    expiryDate: '2025-09-10',
+    unit_of_measure: 'liter',
+    quantity_available: 2500,
+    expiry_date: '2025-09-10',
     image: '/placeholder.svg'
   },
   {
     id: '5',
     name: 'Lentils',
     category: 'Proteins',
-    unitOfMeasure: 'kg',
-    quantityAvailable: 1500,
-    expiryDate: '2025-08-15',
+    unit_of_measure: 'kg',
+    quantity_available: 1500,
+    expiry_date: '2025-08-15',
     image: '/placeholder.svg'
   }
 ];
@@ -319,39 +319,39 @@ export const inventoryTransactions: InventoryTransaction[] = [
 export const blockchainTransactions: BlockchainTransaction[] = [
   {
     hash: '0xabc123def456ghi789jkl123mno456pqr789stu123vwx456yz789abc123',
-    from: '0x1234567890abcdef1234567890abcdef12345678',
-    to: '0x9876543210fedcba9876543210fedcba98765432',
+    from_address: '0x1234567890abcdef1234567890abcdef12345678',
+    to_address: '0x9876543210fedcba9876543210fedcba98765432',
     timestamp: 1682899200, // 2023-05-01
     status: 'confirmed',
-    description: 'Distribution Completed',
-    blockNumber: 14567890
+    action: 'Distribution Completed',
+    block_number: 14567890
   },
   {
     hash: '0x123abc456def789ghi123jkl456mno789pqr123stu456vwx789yz123abc456',
-    from: '0x0000000000000000000000000000000000000000',
-    to: '0x1234567890abcdef1234567890abcdef12345678',
+    from_address: '0x0000000000000000000000000000000000000000',
+    to_address: '0x1234567890abcdef1234567890abcdef12345678',
     timestamp: 1681516800, // 2023-04-15
     status: 'confirmed',
-    description: 'Inventory Addition',
-    blockNumber: 14560001
+    action: 'Inventory Addition',
+    block_number: 14560001
   },
   {
     hash: '0x456def789ghi123jkl456mno789pqr123stu456vwx789yz123abc456def789',
-    from: '0x9876543210fedcba9876543210fedcba98765432',
-    to: '0x1234567890abcdef1234567890abcdef12345678',
+    from_address: '0x9876543210fedcba9876543210fedcba98765432',
+    to_address: '0x1234567890abcdef1234567890abcdef12345678',
     timestamp: 1682467200, // 2023-04-26
     status: 'confirmed',
-    description: 'Beneficiary Registration',
-    blockNumber: 14564532
+    action: 'Beneficiary Registration',
+    block_number: 14564532
   },
   {
     hash: '0x789ghi123jkl456mno789pqr123stu456vwx789yz123abc456def789ghi123',
-    from: '0x9876543210fedcba9876543210fedcba98765432',
-    to: '0xabcdef1234567890abcdef1234567890abcdef12',
+    from_address: '0x9876543210fedcba9876543210fedcba98765432',
+    to_address: '0xabcdef1234567890abcdef1234567890abcdef12',
     timestamp: 1682812800, // 2023-04-30
     status: 'pending',
-    description: 'Distribution Scheduled',
-    blockNumber: 14567123
+    action: 'Distribution Scheduled',
+    block_number: 14567123
   }
 ];
 

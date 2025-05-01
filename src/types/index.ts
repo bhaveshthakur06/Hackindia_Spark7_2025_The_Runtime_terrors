@@ -24,9 +24,9 @@ export interface RationItem {
   id: string;
   name: string;
   category: string;
-  unitOfMeasure: string;
-  quantityAvailable: number;
-  expiryDate?: string;
+  unit_of_measure: string;
+  quantity_available: number;
+  expiry_date?: string;
   image?: string;
 }
 

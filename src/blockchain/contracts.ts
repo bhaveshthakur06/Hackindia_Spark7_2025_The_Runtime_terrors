@@ -38,7 +38,7 @@ export const getProvider = () => {
   
   // Fallback to a read-only provider
   return new ethers.providers.JsonRpcProvider(
-    "https://mainnet.infura.io/v3/your-infura-id"
+    "https://mainnet.infura.io/v3/478b2b0187ab478d9dae67240d07d0a4"
   );
 };
 

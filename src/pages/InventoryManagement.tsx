@@ -1,13 +1,12 @@
-
-import { useState } from "react";
+import React from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { RationItem } from "@/types";
-import { rationItems as mockItems } from "@/mock/data";
+import { RationItem } from "../types/index.ts";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card.tsx";
+import { Button } from "../components/ui/button.tsx";
 import {
   Dialog,
   DialogContent,
@@ -16,24 +15,23 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "../components/ui/dialog.tsx";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+} from "../components/ui/form.tsx";
+import { Input } from "../components/ui/input.tsx";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "../components/ui/select.tsx";
 import {
   Table,
   TableBody,
@@ -41,15 +39,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from "../components/ui/table.tsx";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
+} from "../components/ui/tabs.tsx";
+import { Progress } from "../components/ui/progress.tsx";
+import { Badge } from "../components/ui/badge.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,20 +55,27 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "../components/ui/dropdown-menu.tsx";
 import { Plus, Package, TrendingUp, TrendingDown, MoreHorizontal } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase client
+const supabase = createClient(
+  "https://ayqdbfgwdiejecircotr.supabase.co", // replace with your actual Supabase URL
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF5cWRiZmd3ZGllamVjaXJjb3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxMTE1NDIsImV4cCI6MjA2MTY4NzU0Mn0.Ww0HNOgFppX_8WjOm26W2h6zf6iz__fa91YcRCPaYEU"
+);
 
 // Form schema for adding a new inventory item
 const inventoryItemSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   category: z.string().min(2, "Category is required"),
-  unitOfMeasure: z.string().min(1, "Unit of measure is required"),
-  quantityAvailable: z.coerce.number().min(0, "Quantity cannot be negative"),
-  expiryDate: z.string().optional(),
+  unit_of_measure: z.string().min(1, "Unit of measure is required"),
+  quantity_available: z.coerce.number().min(0, "Quantity cannot be negative"),
+  expiry_date: z.string().optional(),
 });
 
 export default function InventoryManagement() {
-  const [items, setItems] = useState<RationItem[]>(mockItems);
+  const [items, setItems] = useState<RationItem[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -79,64 +84,115 @@ export default function InventoryManagement() {
     defaultValues: {
       name: "",
       category: "",
-      unitOfMeasure: "",
-      quantityAvailable: 0,
-      expiryDate: "",
+      unit_of_measure: "",
+      quantity_available: 0,
+      expiry_date: "",
     },
   });
 
-  const onSubmit = (values: z.infer<typeof inventoryItemSchema>) => {
-    const newItem: RationItem = {
-      id: `item-${Date.now()}`,
+  // Fetch inventory items from Supabase on load
+  useEffect(() => {
+    async function fetchItems() {
+      const { data, error } = await supabase.from("inventory").select("*");
+      if (error) {
+        console.error(error);
+        toast.error("Error loading inventory");
+      } else {
+        setItems(data);
+      }
+    }
+    fetchItems();
+  }, []);
+
+  const onSubmit = async (values: z.infer<typeof inventoryItemSchema>) => {
+    const newItem = {
       name: values.name,
       category: values.category,
-      unitOfMeasure: values.unitOfMeasure,
-      quantityAvailable: values.quantityAvailable,
-      expiryDate: values.expiryDate,
+      unit_of_measure: values.unit_of_measure,
+      quantity_available: values.quantity_available,
+      expiry_date: values.expiry_date || null,
       image: "/placeholder.svg",
     };
 
-    setItems([newItem, ...items]);
-    setIsAddDialogOpen(false);
-    form.reset();
-    toast.success("Inventory item added successfully");
+    // Insert new item into Supabase
+    const { data, error } = await supabase
+      .from("inventory")
+      .insert([newItem])
+      .single();
+
+    if (error) {
+      toast.error("Error adding inventory item");
+      console.error(error);
+    } else {
+      setItems([data as RationItem, ...items]);
+      setIsAddDialogOpen(false);
+      form.reset();
+      toast.success("Inventory item added successfully");
+    }
   };
 
   // Filter items based on active tab
-  const filteredItems = activeTab === "all" 
-    ? items 
+  const filteredItems = activeTab === "all"
+    ? items
     : items.filter((item) => item.category.toLowerCase() === activeTab);
 
   // Add stock to an item
-  const handleAddStock = (itemId: string, quantity: number) => {
-    setItems(
-      items.map((item) =>
-        item.id === itemId
-          ? { ...item, quantityAvailable: item.quantityAvailable + quantity }
-          : item
-      )
-    );
-    toast.success(`Added ${quantity} ${items.find(i => i.id === itemId)?.unitOfMeasure} to inventory`);
+  const handleAddStock = async (itemId: string, quantity: number) => {
+    const updatedItem = items.find((item) => item.id === itemId);
+    if (!updatedItem) return;
+
+    const newQuantity = updatedItem.quantity_available + quantity;
+
+    // Update stock in Supabase
+    const { data, error } = await supabase
+      .from("inventory")
+      .update({ quantity_available: newQuantity })
+      .eq("id", itemId)
+      .single();
+
+    if (error) {
+      toast.error("Error adding stock");
+      console.error(error);
+    } else {
+      setItems(
+        items.map((item) =>
+          item.id === itemId ? { ...item, quantity_available: newQuantity } : item
+        )
+      );
+      toast.success(`Added ${quantity} ${updatedItem.unit_of_measure} to inventory`);
+    }
   };
 
   // Remove stock from an item
-  const handleRemoveStock = (itemId: string, quantity: number) => {
+  const handleRemoveStock = async (itemId: string, quantity: number) => {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
-    
-    if (item.quantityAvailable < quantity) {
+
+    if (item.quantity_available < quantity) {
       toast.error("Cannot remove more than available quantity");
       return;
     }
-    
-    setItems(
-      items.map((item) =>
-        item.id === itemId
-          ? { ...item, quantityAvailable: item.quantityAvailable - quantity }
-          : item
-      )
-    );
-    toast.success(`Removed ${quantity} ${item.unitOfMeasure} from inventory`);
+
+    const newQuantity = item.quantity_available - quantity;
+
+    // Update stock in Supabase
+    const { data, error } = await supabase
+      .from("inventory")
+      .update({ quantity_available: newQuantity })
+      .eq("id", itemId)
+      .single();
+
+    if (error) {
+      toast.error("Error removing stock");
+      console.error(error);
+    } else {
+      setItems(
+        items.map((item) =>
+          item.id === itemId ? { ...item, quantity_available: newQuantity } : item
+        )
+      );
+      toast.success(`Removed ${quantity} ${item.unit_of_measure} from inventory`);
+    }
   };
 
   // Get unique categories for tabs
@@ -208,7 +264,7 @@ export default function InventoryManagement() {
 
                     <FormField
                       control={form.control}
-                      name="unitOfMeasure"
+                      name="unit_of_measure"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Unit of Measure</FormLabel>
@@ -237,7 +293,7 @@ export default function InventoryManagement() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="quantityAvailable"
+                      name="quantity_available"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Initial Quantity</FormLabel>
@@ -255,7 +311,7 @@ export default function InventoryManagement() {
 
                     <FormField
                       control={form.control}
-                      name="expiryDate"
+                      name="expiry_date"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Expiry Date (Optional)</FormLabel>
@@ -324,21 +380,21 @@ export default function InventoryManagement() {
                         </div>
                       </TableCell>
                       <TableCell>{item.category}</TableCell>
-                      <TableCell>{item.unitOfMeasure}</TableCell>
+                      <TableCell>{item.unit_of_measure}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs">
-                            <span>{item.quantityAvailable} {item.unitOfMeasure}</span>
+                            <span>{item.quantity_available} {item.unit_of_measure}</span>
                             <span>
-                              {getStockStatus(item.quantityAvailable)}%
+                              {getStockStatus(item.quantity_available)}%
                             </span>
                           </div>
                           <Progress 
-                            value={getStockStatus(item.quantityAvailable)} 
+                            value={getStockStatus(item.quantity_available)} 
                             className={`h-2 ${
-                              item.quantityAvailable < 1000 
+                              item.quantity_available < 1000 
                                 ? "bg-red-100" 
-                                : item.quantityAvailable < 3000 
+                                : item.quantity_available < 3000 
                                   ? "bg-amber-100" 
                                   : "bg-green-100"
                             }`}
@@ -346,7 +402,7 @@ export default function InventoryManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <StockLevelBadge quantity={item.quantityAvailable} />
+                        <StockLevelBadge quantity={item.quantity_available} />
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -360,7 +416,8 @@ export default function InventoryManagement() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem
                               onClick={() => {
-                                navigator.clipboard.writeText(item.id);
+                                // deno-lint-ignore no-explicit-any
+                                (navigator as any).clipboard.writeText(item.id);
                                 toast.success("Item ID copied to clipboard");
                               }}
                             >
@@ -371,13 +428,13 @@ export default function InventoryManagement() {
                               onClick={() => handleAddStock(item.id, 100)}
                             >
                               <TrendingUp className="mr-2 h-4 w-4 text-green-500" />
-                              Add 100 {item.unitOfMeasure}
+                              Add 100 {item.unit_of_measure}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleRemoveStock(item.id, 100)}
                             >
                               <TrendingDown className="mr-2 h-4 w-4 text-red-500" />
-                              Remove 100 {item.unitOfMeasure}
+                              Remove 100 {item.unit_of_measure}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem>
@@ -408,13 +465,13 @@ export default function InventoryManagement() {
         />
         <InventorySummaryCard
           title="Total Quantity"
-          value={items.reduce((acc, item) => acc + item.quantityAvailable, 0)}
+          value={items.reduce((acc, item) => acc + item.quantity_available, 0)}
           description="Units across all items"
           icon={TrendingUp}
         />
         <InventorySummaryCard
           title="Low Stock Items"
-          value={items.filter((item) => item.quantityAvailable < 1000).length}
+          value={items.filter((item) => item.quantity_available < 1000).length}
           description="Items needing restock"
           icon={TrendingDown}
           variant="warning"
