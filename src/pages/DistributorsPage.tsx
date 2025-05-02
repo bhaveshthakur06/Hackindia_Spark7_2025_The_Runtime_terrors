@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Distributor, DistributionCenter } from "@/types";
+import { Distributor, DistributionCenter, UserRole } from "@/types";
 import { registerDistributor } from "@/blockchain/utils";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,22 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     return R * c;
 }
 
+// Helper to map Supabase distribution center data to DistributionCenter type
+function mapDistributionCenter(center: any): DistributionCenter {
+    return {
+        id: center.id,
+        name: center.name,
+        location: center.location,
+        capacity: center.capacity,
+        inCharge: center.in_charge,
+        contactNumber: center.contact_number,
+        coordinates: {
+            latitude: center.latitude,
+            longitude: center.longitude
+        }
+    };
+}
+
 export default function DistributorsPage() {
     const [distributors, setDistributors] = useState<Distributor[]>([]);
     const [distributionCenters, setDistributionCenters] = useState<DistributionCenter[]>([]);
@@ -114,7 +130,7 @@ export default function DistributorsPage() {
                 }
 
                 setDistributors((distributorData || []).map(mapUserToDistributor));
-                setDistributionCenters(centerData || []);
+                setDistributionCenters((centerData || []).map(mapDistributionCenter));
                 setIsLoading(false);
             } catch (err) {
                 console.error("Unexpected error:", err);
@@ -213,38 +229,56 @@ export default function DistributorsPage() {
     const onSubmit = async (values: z.infer<typeof distributorSchema>) => {
         setIsProcessing(true);
         try {
-            // Register on blockchain if wallet address is provided
-            if (values.walletAddress) {
-                await estimateNetworkFee(values.walletAddress, values.govtId, values.assignedCenter);
-                const transaction = await registerDistributor(
-                    values.walletAddress,
-                    values.govtId,
-                    values.assignedCenter
-                );
-                if (!transaction) {
-                    toast.error("Failed to register on blockchain. Please try again.");
-                    return;
-                }
-            }
-            // Insert into Supabase
-            const { data, error } = await supabase.from("users").insert([
-                {
-                    name: values.name,
-                    wallet_address: values.walletAddress,
-                    govt_id: values.govtId,
-                    phone: values.contactNumber,
-                    assigned_center: values.assignedCenter,
-                    status: values.status,
-                    role: "distributor",
-                    latitude: values.latitude,
-                    longitude: values.longitude,
-                },
-            ]).select().single();
-            if (error) {
-                toast.error("Failed to add distributor");
+            // First, check if the user already exists
+            const { data: existingUser } = await supabase
+                .from("users")
+                .select("id")
+                .eq("govt_id", values.govtId)
+                .single();
+
+            if (existingUser) {
+                toast.error("A user with this Government ID already exists");
                 return;
             }
-            setDistributors([mapUserToDistributor(data), ...distributors]);
+
+            // Prepare the data to be inserted
+            const distributorData = {
+                name: values.name,
+                wallet_address: values.walletAddress || null,
+                govt_id: values.govtId,
+                phone: values.contactNumber,
+                assigned_center: values.assignedCenter,
+                status: values.status,
+                role: "distributor", // Simple string value
+                created_at: new Date().toISOString(),
+            };
+
+            // Log the data being sent
+            console.log('Attempting to insert distributor with data:', JSON.stringify(distributorData, null, 2));
+
+            // Insert into Supabase
+            const { data, error } = await supabase
+                .from("users")
+                .insert([distributorData])
+                .select()
+                .single();
+
+            if (error) {
+                console.error("Error adding distributor:", error);
+                if (error.code === '23502') { // Not null violation
+                    toast.error("Please fill in all required fields");
+                } else if (error.code === '23514') { // Check constraint violation
+                    toast.error("Role must be one of: admin, distributor, beneficiary");
+                    console.error("Failed data:", distributorData);
+                } else {
+                    toast.error(`Failed to add distributor: ${error.message}`);
+                }
+                return;
+            }
+
+            // Add to local state
+            const newDistributor = mapUserToDistributor(data);
+            setDistributors([newDistributor, ...distributors]);
             setIsAddDialogOpen(false);
             form.reset();
             toast.success("Distributor added successfully");

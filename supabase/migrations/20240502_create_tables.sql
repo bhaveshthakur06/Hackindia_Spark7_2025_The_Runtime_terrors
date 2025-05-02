@@ -62,6 +62,39 @@ CREATE TABLE IF NOT EXISTS claims (
     FOREIGN KEY (stock_id) REFERENCES stock_records(id)
 );
 
+-- Create the distributors table
+CREATE TABLE IF NOT EXISTS public.distributors (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    name TEXT NOT NULL,
+    wallet_address TEXT,
+    govt_id TEXT NOT NULL,
+    contact_number TEXT NOT NULL,
+    assigned_center TEXT NOT NULL,
+    status TEXT DEFAULT 'active',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_distributors_name ON public.distributors(name);
+CREATE INDEX IF NOT EXISTS idx_distributors_govt_id ON public.distributors(govt_id);
+CREATE INDEX IF NOT EXISTS idx_distributors_status ON public.distributors(status);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.distributors ENABLE ROW LEVEL SECURITY;
+
+-- Create RLS policies
+CREATE POLICY "Enable read access for all users" ON public.distributors
+    FOR SELECT USING (true);
+
+CREATE POLICY "Enable insert for all users" ON public.distributors
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Enable update for all users" ON public.distributors
+    FOR UPDATE USING (true);
+
+CREATE POLICY "Enable delete for all users" ON public.distributors
+    FOR DELETE USING (true);
+
 -- Enable Row Level Security on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;

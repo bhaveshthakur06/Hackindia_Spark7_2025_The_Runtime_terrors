@@ -2,6 +2,7 @@
 DROP POLICY IF EXISTS "Allow read access to all authenticated users" ON users;
 DROP POLICY IF EXISTS "Allow users to update their own data" ON users;
 DROP POLICY IF EXISTS "Allow admin to manage all users" ON users;
+DROP POLICY IF EXISTS "Allow authenticated users to insert" ON users;
 
 -- Enable RLS on users table
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -28,9 +29,9 @@ FOR ALL
 TO authenticated
 USING (
   EXISTS (
-    SELECT 1 FROM users
+    SELECT 1 FROM auth.users
     WHERE id = auth.uid()
-    AND role = 'admin'
+    AND raw_user_meta_data->>'role' = 'admin'
   )
 );
 
